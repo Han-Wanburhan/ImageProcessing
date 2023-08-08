@@ -2,7 +2,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-image = cv2.imread('cat.jpg')
+image = cv2.imread('./Lab1/Image/cat.jpg')
 rgb_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 rgb_image = resize_img1 = cv2.resize(rgb_image, (200, 200))
 
