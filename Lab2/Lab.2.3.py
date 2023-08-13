@@ -74,6 +74,7 @@ for i, c in enumerate('bgr'):
     ax5.plot(hist, c)  # Histogram
     ax6.plot(cdf2, c)  # Cumulative Distribution Function
     ax6.set_ylabel("CDF")
-
+    
+cv2.imwrite('./Lab2/img/output/image_result.jpg', image_result)
 plt.tight_layout()
 plt.show()
