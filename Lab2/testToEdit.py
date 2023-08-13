@@ -1,10 +1,6 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage.io import imread                         # load the image
-from skimage.exposure import cumulative_distribution  # calculate the cumulative pixel value
-import numpy as np                                    # reshape the image
-import matplotlib.pyplot as plt                       # plot the result
 
 img_1 = cv2.imread("./Lab2/img/Tea1.jpg")
 image1_resized = cv2.resize(img_1, (200, 200))
@@ -15,12 +11,6 @@ im1b, im1g, im1r = cv2.split(image1_resized)
 im2b, im2g, im2r = cv2.split(image2_resized)
 
 pixels = np.arange(256)
-
-def getCDF(image):
-    cdf, bins = cumulative_distribution(image)
-    cdf = np.insert(cdf, 0, [0]*bins[0])
-    cdf = np.append(cdf, [1]*(255-bins[-1]))
-    return cdf
 
 def histMatch(cdfInput, cdfTemplate, imageInput):
     pixelValues = np.arange(256)
@@ -57,9 +47,7 @@ for i, c in enumerate('bgr'):
 image_result = np.zeros((image1_resized.shape)).astype(np.uint8)
 
 for i in range(3):
-    cdfInput = getCDF(image1_resized[:,:,i])
-    cdfTemplate = getCDF(image2_resized[:,:,i])
-    image_result[:,:,i] = histMatch(cdfInput, cdfTemplate, image1_resized[:,:,i])
+    image_result[:,:,i] = histMatch(cdf1, cdf2, image1_resized[:,:,i])
 
 
 plt.subplot(3, 3, 7)
