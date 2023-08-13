@@ -6,9 +6,9 @@ from skimage.exposure import cumulative_distribution  # calculate the cumulative
 import numpy as np                                    # reshape the image
 import matplotlib.pyplot as plt                       # plot the result
 
-img_1 = cv2.imread("./Lab2/img/Tea1.jpg")
+img_1 = cv2.imread("./Lab2/img/Temp1.jpg")
 image1_resized = cv2.resize(img_1, (200, 200))
-img_2 = cv2.imread("./Lab2/img/Tea2.jpg")
+img_2 = cv2.imread("./Lab2/img/Temp2.jpg")
 image2_resized = cv2.resize(img_2, (200, 200))
 
 im1b, im1g, im1r = cv2.split(image1_resized)
