@@ -6,9 +6,13 @@ def GammaEquation(img, gamma):
     A = 1
     B = 0
     result_img = A * (img ** gamma) + B
-    result_img[result_img < 0] = 0
-    result_img[result_img > 255] = 255
+    result_img = Quantize(result_img)
     return result_img.astype(np.uint8)
+
+def Quantize (img):
+    img = (img-np.min(img))/(np.max(img)-np.min(img))
+    img = img*(2**8-1)
+    return img
 
 img_1 = cv2.imread("./Lab2/img/Miso.jpg")
 # image_resized = cv2.resize(img_1, (200, 200))
@@ -19,7 +23,7 @@ fps = 1
 
 vid_output = cv2.VideoWriter(output_file, fourcc, fps, (img_1.shape[1], img_1.shape[0]))
 
-Y_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20]
+Y_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.99]
 
 for gamma in Y_values:
     adjusted_img = GammaEquation(img_1, gamma)
