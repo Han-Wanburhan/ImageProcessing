@@ -48,7 +48,8 @@ print(listparam)
 # Plot the feature maps
 for i in range(feature_maps.shape[3]):
     plt.subplot(8, 8, i + 1)  # Adjust the subplot layout as needed
-    plt.imshow(feature_maps[0, :, :, i], cmap='gray')  # Display a single feature map
+    plt.imshow(feature_maps[0, :, :, i],cmap='gray' )  # Display a single feature map
     plt.axis('off')
+    plt.title("3.1")
 
 plt.show()
