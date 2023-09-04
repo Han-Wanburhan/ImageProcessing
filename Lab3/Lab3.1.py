@@ -13,7 +13,8 @@ kernels, biases = model.layers[1].get_weights()
 listparam = model.layers[1].get_config()
 
 # Load and preprocess the image
-image = cv2.imread('./Lab3/image/B.jpeg')
+# image = cv2.imread('./Lab3/image/B.jpeg')
+image = cv2.imread('./Lab3/image/A.jpg')
 if image is None:
     raise ValueError("Failed to load the image.")
 
