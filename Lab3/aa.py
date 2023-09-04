@@ -4,27 +4,46 @@ from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.preprocessing.image import img_to_array
 from numpy import expand_dims
 from matplotlib import pyplot as plt
+from scipy import signal
+
+# Load the VGG16 model
+model = VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+
 # Load and preprocess the image
 image = cv2.imread('./Lab3/image/B.jpeg')
+# image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+image = cv2.resize(image, (224, 224))
+img = img_to_array(image)
+img = expand_dims(img, axis=0)
+img = preprocess_input(img)
 
-image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert to RGB color space
+# Get the weights (kernels) and biases from the first convolutional layer
+layer = model.layers[1]
+weights, biases = layer.get_weights()
 
+# Perform convolution for each color channel and each kernel
+img_result = np.zeros((1, 224, 224, len(biases)))
 
+for i in range(len(biases)):  # Loop over each filter
+    for channel in range(img.shape[-1]):  # Loop over each color channel
+        img_result[:, :, :, i] += signal.convolve2d(
+            img[0, :, :, channel], weights[:, :, channel, i], mode='same', boundary='fill', fillvalue=0
+        )
 
-image = cv2.resize(image, (224, 224))  # Resize to VGG16 input size
+# Add the biases to the convolutional results
+for i in range(len(biases)):
+    img_result[:, :, :, i] += biases[i]
 
-rs_image = np.reshape(image,(1,image.shape[0],image.shape[1],image.shape[2]))
+# Apply ReLU activation function
+img_result[img_result < 0] = 0
 
-img_mean1 = np.array([103.93, 116.779, 123.68])  # Mean pixel values
+# Display the result of convolution and ReLU activation (64 feature maps)
+plt.figure(figsize=(12, 12))
+for i in range(64):
+    plt.subplot(8, 8, i + 1)
+    plt.imshow(img_result[0, :, :, i], cmap='gray')
+    plt.axis('off')
+    plt.title(f'Feature Map {i + 1}')
 
-rgb_image1 = rs_image - img_mean1  # Subtract mean values
-
-plt.subplot(1, 2, 1)  # 1 row, 2 columns, subplot 1
-plt.imshow(image)
-plt.title('Original Image')
-
-plt.subplot(1, 2, 2)  # 1 row, 2 columns, subplot 2
-plt.imshow(rgb_image1[0,:,:,:],cmap='gray')
-plt.title('Preprocessed Image')
-
+plt.tight_layout()
 plt.show()
