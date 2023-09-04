@@ -26,6 +26,10 @@ kernels, biases = layer.get_weights()
 img_result = np.zeros((1, 224, 224, len(biases)))
 
 
+img_mean = np.array([123.68, 116.779, 103.93])  # Mean pixel values
+
+img = img - img_mean # Subtract mean values
+
 for i in range(len(biases)):  # Loop over each filter
     for channel in range(img.shape[-1]):  # Loop over each color channel
         img_result[:, :, :, i] += signal.convolve2d(
