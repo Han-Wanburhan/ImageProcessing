@@ -1,133 +1,142 @@
-# import cv2
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from keras import Model, Input
-# from keras.layers import Dense, Conv2D, MaxPooling2D, UpSampling2D
-# from keras.callbacks import EarlyStopping
-# from sklearn.model_selection import train_test_split
-# import glob
-# from tqdm import tqdm
-# import warnings
-# Import necessary libraries
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from keras import Model, Input
-from keras.layers import Dense, Conv2D, MaxPool2D, UpSampling2D
+from keras.layers import Dense, Conv2D, MaxPooling2D, UpSampling2D
 from keras.callbacks import EarlyStopping
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 import glob
 from tqdm import tqdm
 import warnings
-# warnings.filterwarnings('ignore')
 
-# Set GPU
+# Ignore warnings
+warnings.filterwarnings('ignore')
+
+# GPU configuration (optional)
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-# Suppress warnings
-warnings.filterwarnings('ignore')
+# Step 1: Read and preprocess image data
+image_files = glob.glob("./Lab4/face_mini/**/*.jpg", recursive=True)
+imgs = []
 
-# # Function to load and preprocess images
-# def load_and_preprocess_images(image_paths, target_size=(100, 100), noise_std=0.1, noise_factor=0.2):
-#     images = []
-#     for path in tqdm(image_paths):
-#         img = cv2.imread(path)
-#         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-#         img = cv2.resize(img, target_size)  # Resize to target_size
+for fname in tqdm(image_files):
+    img = cv2.imread(fname)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (100, 100))
+    img = np.array(img)
+    imgs.append(img)
 
-#         # Normalize the image pixel values to [0, 1]
-#         img = img / 255.0
+imgs = np.array(imgs) / 255.0
 
-#         # Add noise to the image
-#         noise = np.random.normal(0, noise_std, img.shape).astype('float32')
-#         noisy_img = img + noise_factor * noise
-
-#         images.append((img, noisy_img))
-
-#     return np.array(images)
-
-# Function to load and preprocess images with increased noise 
-
-
-def load_and_preprocess_images(image_paths, target_size=(100, 100), noise_std=0.4, noise_factor=0.5):
-    images = []
-    for path in tqdm(image_paths):
-        img = cv2.imread(path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-        img = cv2.resize(img, target_size)  # Resize to target_size
-
-        # Normalize the image pixel values to [0, 1]
-        img = img / 255.0
-
-        # Add more noise to the image
-        noise = np.random.normal(0, noise_std, img.shape).astype('float32')
-        noisy_img = img + noise_factor * noise
-
-        # Clip pixel values to [0, 1] range
-        noisy_img = np.clip(noisy_img, 0, 1)
-
-        images.append((img, noisy_img))
-
-    return np.array(images)
-
-# Step 1: Load and preprocess images
-image_paths = glob.glob("./Lab4/face_mini/*/*.jpg")  # Modify the path as needed
-imgs_with_noise = load_and_preprocess_images(image_paths)
-
-# Step 2: Split data into training and testing sets
-train_data, test_data = train_test_split(imgs_with_noise, test_size=0.3, random_state=42)
+# Step 2: Split data into training, validation, and test sets
+random_state = 42
+train_x, test_x = train_test_split(imgs, random_state=random_state, test_size=0.3)
 
 # Step 3: Split training data into training and validation sets
-train_data, val_data = train_test_split(train_data, test_size=0.2, random_state=42)
+train_x, val_x = train_test_split(train_x, random_state=random_state, test_size=0.2)
 
-# Step 4: Define your deep learning model (autoencoder for denoising)
-input_img = Input(shape=(100, 100, 3))
+# Step 4: Define noise parameters
+noise_mean = 0
+noise_std = 0.5
+noise_factor = 0.6
 
-# Encoder
-x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
-x = MaxPool2D((2, 2), padding='same')(x)
+# Step 5: Add noise to the data
+train_x_noise = train_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=train_x.shape))
+val_x_noise = val_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=val_x.shape))
+test_x_noise = test_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=test_x.shape))
 
-# Decoder
-x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-x = UpSampling2D((2, 2))(x)
-decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
+# Step 6: Define the function to create the autoencoder model
+def create_autoencoder(optimizer='adam', learning_rate=0.001, batch_size=16, epochs=20):
+    # Define the encoder architecture
+    Input_img = Input(shape=(100, 100, 3))
+    x1 = Conv2D(256, (3, 3), activation='relu', padding='same')(Input_img)
+    x2 = Conv2D(128, (3, 3), activation='relu', padding='same')(x1)
+    x3 = MaxPooling2D((2, 2), strides=(2, 2))(x2)
+    encoded = Conv2D(64, (3, 3), activation='relu', padding='same')(x3)
+    x4 = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
+    x5 = UpSampling2D((2, 2))(x4)
+    x6 = Conv2D(128, (3, 3), activation='relu', padding='same')(x5)
+    x7 = Conv2D(256, (3, 3), activation='relu', padding='same')(x6)
+    
+    # Define the decoder architecture
+    decoded_img = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x7)
+    
+    # Create the autoencoder model
+    autoencoder = Model(Input_img, decoded_img)
+    autoencoder.compile(optimizer=optimizer, loss='mean_squared_error')
+    
+    return autoencoder
 
-autoencoder = Model(input_img, decoded)
-autoencoder.compile(optimizer='adam', loss='mean_squared_error')
+# Step 7: Define the parameter grid for hyperparameter tuning
+opts = ['adam', 'sgd']
+lnR = [0.001, 0.01, 0.1]
+bs = [16, 32]
+eps = [10, 30]
 
-# Step 5: Train your model
-autoencoder.fit(train_data[:, 1], train_data[:, 0],
-                epochs=32,
-                batch_size=16,
-                shuffle=True,
-                validation_data=(val_data[:, 1], val_data[:, 0]),
-                callbacks=[EarlyStopping(monitor='val_loss', patience=5)])
+param_grid = dict(optimizer=opts, learning_rate=lnR, batch_size=bs, epochs=eps)
 
-# Step 6: Perform denoising on test data
-denoised_test_data = autoencoder.predict(test_data[:, 1])
+# Step 8: Create the KerasRegressor model
+model = KerasRegressor(build_fn=create_autoencoder, verbose=0)
 
-# Step 7: Display original, noisy, and denoised images
-n = 10  # Number of images to display
-plt.figure(figsize=(20, 6))
+# Step 9: Create the GridSearchCV object
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=2, verbose=10)
+
+# Step 10: Fit the grid search to your data
+grid_result = grid.fit(train_x_noise, train_x)
+
+# Step 11: Print the best parameters and score
+print("Best Parameters:", grid_result.best_params_)
+print("Best Score:", grid_result.best_score_)
+
+# Step 12: Get the mean and standard deviation of the scores for each parameter set
+means = grid_result.cv_results_['mean_test_score']
+stds = grid_result.cv_results_['std_test_score']
+params = grid_result.cv_results_['params']
+
+for mean, std, param in zip(means, stds, params):
+    print(f"Mean: {mean}, Std: {std}, Params: {param}")
+
+# Step 13: Train the autoencoder with the best hyperparameters
+best_params = grid_result.best_params_
+autoencoder = create_autoencoder(**best_params)
+history = autoencoder.fit(train_x_noise, train_x, epochs=best_params['epochs'], batch_size=best_params['batch_size'],
+                          shuffle=True, validation_data=(val_x_noise, val_x), verbose=1)
+
+# Step 14: Plot the training loss
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+# Step 15: Generate denoised images using the trained autoencoder
+predictions_test = autoencoder.predict(test_x_noise)
+
+# Step 16: Display original, noisy, and reconstructed images
+n = 10
+plt.figure(figsize=(50, 6))
 
 for i in range(n):
     # Display original images
     ax = plt.subplot(3, n, i + 1)
-    plt.imshow(test_data[i, 0])
+    plt.imshow(test_x[i])
     plt.title("Original")
     plt.axis('off')
 
     # Display noisy images
     ax = plt.subplot(3, n, i + 1 + n)
-    plt.imshow(test_data[i, 1])
+    plt.imshow(test_x_noise[i])
     plt.title("Noisy")
     plt.axis('off')
 
-    # Display denoised images
+    # Display reconstructed images
     ax = plt.subplot(3, n, i + 1 + 2 * n)
-    plt.imshow(denoised_test_data[i])
-    plt.title("Denoised")
+    plt.imshow(predictions_test[i])
+    plt.title("Reconstructed")
     plt.axis('off')
-
+    
 plt.show()
