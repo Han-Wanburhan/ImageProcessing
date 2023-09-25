@@ -105,38 +105,5 @@ autoencoder = create_autoencoder(**best_params)
 history = autoencoder.fit(train_x_noise, train_x, epochs=best_params['epochs'], batch_size=best_params['batch_size'],
                           shuffle=True, validation_data=(val_x_noise, val_x), verbose=1)
 
-# # Step 14: Plot the training loss
-# plt.plot(history.history['loss'], label='Train Loss')
-# plt.plot(history.history['val_loss'], label='Validation Loss')
-# plt.title('Model Loss')
-# plt.xlabel('Epochs')
-# plt.ylabel('Loss')
-# plt.legend()
-
-# # Step 15: Generate denoised images using the trained autoencoder
-# predictions_test = autoencoder.predict(test_x_noise)
-
-# # Step 16: Display original, noisy, and reconstructed images
-# n = 10
-# plt.figure(figsize=(50, 6))
-
-# for i in range(n):
-#     # Display original images
-#     ax = plt.subplot(3, n, i + 1)
-#     plt.imshow(test_x[i])
-#     plt.title("Original")
-#     plt.axis('off')
-
-#     # Display noisy images
-#     ax = plt.subplot(3, n, i + 1 + n)
-#     plt.imshow(test_x_noise[i])
-#     plt.title("Noisy")
-#     plt.axis('off')
-
-#     # Display reconstructed images
-#     ax = plt.subplot(3, n, i + 1 + 2 * n)
-#     plt.imshow(predictions_test[i])
-#     plt.title("Reconstructed")
-#     plt.axis('off')
-    
-# plt.show()
+# # Step 14: Return the best parameters
+# best_params

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from keras import Model, Input
-from keras.layers import Dense, Conv2D, MaxPooling2D, UpSampling2D
+from keras.layers import Dense, Conv2D, MaxPooling2D, UpSampling2D, BatchNormalization
 from keras.callbacks import EarlyStopping
 from keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.model_selection import GridSearchCV
@@ -53,21 +53,25 @@ def create_autoencoder(optimizer='adam', learning_rate=0.001, batch_size=16, epo
     # Define the encoder architecture
     Input_img = Input(shape=(100, 100, 3))
     x1 = Conv2D(256, (3, 3), activation='relu', padding='same')(Input_img)
+    x1 = BatchNormalization()(x1)
     x2 = Conv2D(128, (3, 3), activation='relu', padding='same')(x1)
+    x2 = BatchNormalization()(x2)
     x3 = MaxPooling2D((2, 2), strides=(2, 2))(x2)
     encoded = Conv2D(64, (3, 3), activation='relu', padding='same')(x3)
     x4 = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
     x5 = UpSampling2D((2, 2))(x4)
     x6 = Conv2D(128, (3, 3), activation='relu', padding='same')(x5)
+    x6 = BatchNormalization()(x6)
     x7 = Conv2D(256, (3, 3), activation='relu', padding='same')(x6)
-    
+    x7 = BatchNormalization()(x7)
+
     # Define the decoder architecture
     decoded_img = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x7)
-    
+
     # Create the autoencoder model
     autoencoder = Model(Input_img, decoded_img)
     autoencoder.compile(optimizer=optimizer, loss='mean_squared_error')
-    
+
     return autoencoder
 
 # Step 7: Define the parameter grid for hyperparameter tuning
@@ -102,41 +106,13 @@ for mean, std, param in zip(means, stds, params):
 # Step 13: Train the autoencoder with the best hyperparameters
 best_params = grid_result.best_params_
 autoencoder = create_autoencoder(**best_params)
+
+# Add EarlyStopping callback
+callback = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+# Train the model
 history = autoencoder.fit(train_x_noise, train_x, epochs=best_params['epochs'], batch_size=best_params['batch_size'],
-                          shuffle=True, validation_data=(val_x_noise, val_x), verbose=1)
+                          shuffle=True, validation_data=(val_x_noise, val_x), verbose=1, callbacks=[callback])
 
-# # Step 14: Plot the training loss
-# plt.plot(history.history['loss'], label='Train Loss')
-# plt.plot(history.history['val_loss'], label='Validation Loss')
-# plt.title('Model Loss')
-# plt.xlabel('Epochs')
-# plt.ylabel('Loss')
-# plt.legend()
-
-# # Step 15: Generate denoised images using the trained autoencoder
-# predictions_test = autoencoder.predict(test_x_noise)
-
-# # Step 16: Display original, noisy, and reconstructed images
-# n = 10
-# plt.figure(figsize=(50, 6))
-
-# for i in range(n):
-#     # Display original images
-#     ax = plt.subplot(3, n, i + 1)
-#     plt.imshow(test_x[i])
-#     plt.title("Original")
-#     plt.axis('off')
-
-#     # Display noisy images
-#     ax = plt.subplot(3, n, i + 1 + n)
-#     plt.imshow(test_x_noise[i])
-#     plt.title("Noisy")
-#     plt.axis('off')
-
-#     # Display reconstructed images
-#     ax = plt.subplot(3, n, i + 1 + 2 * n)
-#     plt.imshow(predictions_test[i])
-#     plt.title("Reconstructed")
-#     plt.axis('off')
-    
-# plt.show()
+# Step 14: Return the best parameters
+best_params
