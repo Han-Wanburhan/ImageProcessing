@@ -1,109 +1,124 @@
+#Array, image processing
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+#Model Operation
 from keras import Model, Input
-from keras.layers import Dense, Conv2D, MaxPooling2D, UpSampling2D
-from keras.callbacks import EarlyStopping
+from keras.optimizers import Adam,SGD,RMSprop,Adadelta
+import keras.utils as image
 from keras.wrappers.scikit_learn import KerasRegressor
-from sklearn.model_selection import GridSearchCV
+from tensorflow.keras.layers import Dense, Conv2D, MaxPool2D, UpSampling2D
+from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn import metrics
+from scipy import signal
+
+# io
 import glob
 from tqdm import tqdm
 import warnings
-
-# Ignore warnings
 warnings.filterwarnings('ignore')
 
-# GPU configuration (optional)
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+#ทำโครงข่ายของการประมาลผล หรือ การทำโมเดล Connect Encoder and Decoder Model
+def create_autoencoder(optimizer= 'Adam',learning_rates = None):
+    Input_img = Input(shape=(80,80,3))
+    otp = None
 
-# Step 1: Read and preprocess image data
-image_files = glob.glob("./Lab4/face_mini/**/*.jpg", recursive=True)
-imgs = []
+    x1 = Conv2D(256, (3,3), activation = 'relu', padding = 'same')(Input_img)
+    x2 = Conv2D(128, (3,3), activation = 'relu', padding = 'same')(x1)
+    x2 = MaxPool2D((2,2))(x2)
+    x3 = Conv2D(128, (3,3), activation = 'relu', padding = 'same')(x2)
+    encoded = Conv2D(64, (3,3), activation = 'relu', padding = 'same')(x3)
 
-for fname in tqdm(image_files):
-    img = cv2.imread(fname)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (100, 100))
-    img = np.array(img)
-    imgs.append(img)
+    x4 = Conv2D(64, (3,3), activation = 'relu', padding = 'same')(encoded)
+    x5 = Conv2D(128, (3,3), activation = 'relu', padding = 'same')(x4)
+    x5 = UpSampling2D((2,2))(x5)
+    x6 = Conv2D(128, (3,3), activation = 'relu', padding = 'same')(x5)
+    x7 = Conv2D(256, (3,3), activation = 'relu', padding = 'same')(x6)
+    decoded = Conv2D(3, (3,3), padding = 'same')(x7)
 
-imgs = np.array(imgs) / 255.0
+    autoencoder = Model(Input_img, decoded)
+    if optimizer == 'Adam':
+        otp = Adam(learning_rates)
+    elif optimizer == 'SGD':
+        otp = SGD(learning_rates)
+    elif optimizer == 'RMSprop':
+        otp = RMSprop(learning_rates)
+    elif optimizer == 'Adadelta':
+        otp = Adadelta(learning_rates)
 
-# Step 2: Split data into training, validation, and test sets
-random_state = 42
-train_x, test_x = train_test_split(imgs, random_state=random_state, test_size=0.3)
+    autoencoder.compile(optimizer=otp, loss = 'mean_squared_error', metrics = ['mean_squared_error'])
 
-# Step 3: Split training data into training and validation sets
-train_x, val_x = train_test_split(train_x, random_state=random_state, test_size=0.2)
+    return autoencoder
 
-# Step 4: Define noise parameters
-noise_mean = 0
-noise_std = 0.5
-noise_factor = 0.6
 
-# Step 5: Add noise to the data
+intensity = [0, 1]
+k = 42
+scalar = 0.5
+noise_mean = 0.3 
+noise_std = scalar
+noise_factor = scalar
+ImgArray = []
+
+#ส่วนของการอ่านภาพมาจากโฟเคอร์ที่เก็บภาพแล้วใส่ใน array ที่เราสร้างไว้
+imgs = glob.glob('./Lab4/face_mini/**/*.jpg')
+for img in imgs:
+    loadImg = cv2.imread(img)
+    ResizeImg = cv2.resize(loadImg, (80, 80))
+    rgb_image = cv2.cvtColor(ResizeImg, cv2.COLOR_BGR2RGB)
+    ImgArray.append(rgb_image)
+
+#ส่วนของการทำ Nomirise
+ImgsArray = np.array(ImgArray)
+ImgsArray = ImgsArray / 255
+
+train_x, test_x = train_test_split(ImgsArray, random_state=k, test_size=0.3)
+
+train_x, val_x = train_test_split(train_x, random_state=k, test_size=0.2)
+
+
 train_x_noise = train_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=train_x.shape))
 val_x_noise = val_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=val_x.shape))
 test_x_noise = test_x + (noise_factor * np.random.normal(loc=noise_mean, scale=noise_std, size=test_x.shape))
 
-# Step 6: Define the function to create the autoencoder model
-def create_autoencoder(optimizer='adam', learning_rate=0.001, batch_size=16, epochs=20):
-    # Define the encoder architecture
-    Input_img = Input(shape=(100, 100, 3))
-    x1 = Conv2D(256, (3, 3), activation='relu', padding='same')(Input_img)
-    x2 = Conv2D(128, (3, 3), activation='relu', padding='same')(x1)
-    x3 = MaxPooling2D((2, 2), strides=(2, 2))(x2)
-    encoded = Conv2D(64, (3, 3), activation='relu', padding='same')(x3)
-    x4 = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
-    x5 = UpSampling2D((2, 2))(x4)
-    x6 = Conv2D(128, (3, 3), activation='relu', padding='same')(x5)
-    x7 = Conv2D(256, (3, 3), activation='relu', padding='same')(x6)
-    
-    # Define the decoder architecture
-    decoded_img = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x7)
-    
-    # Create the autoencoder model
-    autoencoder = Model(Input_img, decoded_img)
-    autoencoder.compile(optimizer=optimizer, loss='mean_squared_error')
-    
-    return autoencoder
 
-# Step 7: Define the parameter grid for hyperparameter tuning
-opts = ['adam', 'sgd']
-lnR = [0.001, 0.01, 0.1]
-bs = [16, 32]
-eps = [10, 30]
+epoch = [150,200]
+batch_size = [2,32]
+optimizer = ['SGD', 'Adam']
+learning_rates = [0.01, 0.001]
 
-param_grid = dict(optimizer=opts, learning_rate=lnR, batch_size=bs, epochs=eps)
 
-# Step 8: Create the KerasRegressor model
-model = KerasRegressor(build_fn=create_autoencoder, verbose=0)
+#การ test model ที่เราใช้งาน
+#ใส่ model ที่ดราสร้างโดยที่ค่า batch_size จะอยู่ที่ 16 คือคือพารามิเตอร์ที่ใช้ในการกำหนดจำนวนของข้อมูลที่จะถูกนำเข้าไปในโมเดลเพื่อใช้ในกระบวนการฝึกสอน
+#และใส่ค่า epoch หรือ จำนวนรอบของการสอน
+model = KerasRegressor(build_fn=create_autoencoder, epochs=2, batch_size=16, verbose=0)
 
-# Step 9: Create the GridSearchCV object
-grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=2, verbose=10)
 
-# Step 10: Fit the grid search to your data
+#ใช้ในการกำหนดค่าที่คุณต้องการใช้ในกระบวนการ Grid Search หรือการค้นหาค่า hyperparameter ที่ดีที่สุดสำหรับโมเดลกำหนดค่าการสอนในรูปแบบต่างๆ
+param_grid = dict(batch_size=batch_size, epochs=epoch, optimizer=optimizer,learning_rates = learning_rates)
+
+#ใช้สำหรับการทำค้นหา (hyperparameter tuning) ในโมเดลเครื่องจักร (machine learning) โดยใช้กระบวนการทดลองค่า hyperparameter ที่แตกต่างกันเพื่อหาค่า hyperparameter ที่ดีที่สุดสำหรับโมเดล
+#n_jobs: คือจำนวนงาน (jobs) ที่คุณต้องการให้ GridSearchCV ทำงานพร้อมกัน การใช้ n_jobs ที่มากกว่า 1 จะช่วยเร่งกระบวนการ Grid Search แต่ควรระมัดระวังเรื่องทรัพยากรระบบ
+#verbose: ระบุระดับของการแสดงผลในระหว่างกระบวนการค้นหา hyperparameter. ในที่นี้คุณใช้ verbose=10 เพื่อให้แสดงผลละเอียดมาก
+#cv: คือจำนวนของ fold ใน cross-validation ที่คุณต้องการใช้ในกระบวนการค้นหา. ในที่นี้ใช้ cv=2 หมายถึงการใช้ K-Fold Cross Validation โดยแบ่งข้อมูลออกเป็น 2 ส่วน
+#param_grid: คือ dictionary ที่ระบุค่าที่คุณต้องการทดลองสำหรับแต่ละ hyperparameter ในโมเดลของคุณ เช่นค่า batch_size, epochs, optimizer, และ learning_rate ที่ต้องการทดลอง
+grid = GridSearchCV(estimator=model, n_jobs=1, verbose= 10, cv=4, param_grid=param_grid)
 grid_result = grid.fit(train_x_noise, train_x)
 
-# Step 11: Print the best parameters and score
-print("Best Parameters:", grid_result.best_params_)
-print("Best Score:", grid_result.best_score_)
+best_params = grid_result.best_params_
+best_score = grid_result.best_score_
 
-# Step 12: Get the mean and standard deviation of the scores for each parameter set
 means = grid_result.cv_results_['mean_test_score']
 stds = grid_result.cv_results_['std_test_score']
 params = grid_result.cv_results_['params']
 
-for mean, std, param in zip(means, stds, params):
-    print(f"Mean: {mean}, Std: {std}, Params: {param}")
+#แสดงผลคะแนน
+print(f'Best params : {best_params}')
+print(f'Best score : {best_score}')
 
-# Step 13: Train the autoencoder with the best hyperparameters
-best_params = grid_result.best_params_
-autoencoder = create_autoencoder(**best_params)
-history = autoencoder.fit(train_x_noise, train_x, epochs=best_params['epochs'], batch_size=best_params['batch_size'],
-                          shuffle=True, validation_data=(val_x_noise, val_x), verbose=1)
+for mean,stdev,param in zip(means,stds,params):
+    print("%f (%f) whit: %r" % (mean,stdev,param))
 
-# # Step 14: Return the best parameters
-# best_params
+
+

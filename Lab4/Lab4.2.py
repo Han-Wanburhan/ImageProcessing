@@ -7,10 +7,6 @@ from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 import glob
 from tqdm import tqdm
-# from keras.preprocessing.image import img_to_array
-
-import glob
-from tqdm import tqdm
 import warnings;
 warnings.filterwarnings('ignore')
 
@@ -134,3 +130,4 @@ for i in range(n):
     plt.axis('off')
     
 plt.show()
+
